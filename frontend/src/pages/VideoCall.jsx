@@ -2,7 +2,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
-import HeyGenAvatar from '../components/HeyGenAvatar'; // ✅ was ARIAInterview
+import HeyGenAvatar from '../components/HeyGenAvatar';
+import FaceAnalyzer from '../components/FaceAnalyzer';   // ✅ new
+import FaceReport   from '../components/FaceReport';     // ✅ new
 import API from '../api/api';
 import './VideoCall.css';
 
@@ -11,216 +13,154 @@ const SOCKET_URL = 'http://localhost:5000';
 function VideoCall() {
   const { roomId } = useParams();
   const navigate = useNavigate();
-  
-  const [localStream, setLocalStream] = useState(null);
-  const [remoteStreams, setRemoteStreams] = useState([]);
-  const [isMuted, setIsMuted] = useState(false);
-  const [isVideoOff, setIsVideoOff] = useState(false);
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
-  const [chatMessages, setChatMessages] = useState([]);
-  const [chatInput, setChatInput] = useState('');
-  const [showChat, setShowChat] = useState(false);
-  const [showAI, setShowAI] = useState(false);
-  const [roomUsers, setRoomUsers] = useState([]);
-  const [isHost, setIsHost] = useState(false);
 
-  const localVideoRef = useRef(null);
-  const socketRef = useRef(null);
-  const peersRef = useRef({});
+  const [localStream, setLocalStream]     = useState(null);
+  const [remoteStreams, setRemoteStreams]  = useState([]);
+  const [isMuted, setIsMuted]             = useState(false);
+  const [isVideoOff, setIsVideoOff]       = useState(false);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [chatMessages, setChatMessages]   = useState([]);
+  const [chatInput, setChatInput]         = useState('');
+  const [showChat, setShowChat]           = useState(false);
+  const [showAI, setShowAI]               = useState(false);
+  const [roomUsers, setRoomUsers]         = useState([]);
+  const [isHost, setIsHost]               = useState(false);
+
+  // ✅ new state
+  const [faceAnalysisOn, setFaceAnalysisOn] = useState(false);
+  const [faceReport, setFaceReport]         = useState(null);
+  const [showFaceReport, setShowFaceReport] = useState(false);
+
+  const localVideoRef  = useRef(null);
+  const socketRef      = useRef(null);
+  const peersRef       = useRef({});
   const screenStreamRef = useRef(null);
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
   useEffect(() => {
-    if (!user.id) {
-      navigate('/login');
-      return;
-    }
-
-    if (user.role === 'recruiter' || user.role === 'admin') {
-      setIsHost(true);
-    }
-
+    if (!user.id) { navigate('/login'); return; }
+    if (user.role === 'recruiter' || user.role === 'admin') setIsHost(true);
     initializeMediaAndSocket();
-
     return () => {
-      if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-      }
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-      }
-      Object.values(peersRef.current).forEach(peer => peer.close());
+      if (localStream) localStream.getTracks().forEach(t => t.stop());
+      if (socketRef.current) socketRef.current.disconnect();
+      Object.values(peersRef.current).forEach(p => p.close());
     };
   }, []);
 
   const initializeMediaAndSocket = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 1280, height: 720 },
-        audio: true
+        video: { width: 1280, height: 720 }, audio: true
       });
-
       setLocalStream(stream);
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-      }
+      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
 
       socketRef.current = io(SOCKET_URL);
-
-      socketRef.current.emit('join-room', {
-        roomId,
-        userId: user.id,
-        userName: user.name
-      });
-
-      socketRef.current.on('room-users', (users) => {
-        setRoomUsers(users);
-      });
-
-      socketRef.current.on('user-joined', ({ userId, userName }) => {
-        addChatMessage(`${userName} joined the call`, 'system');
-      });
-
-      socketRef.current.on('user-left', ({ userId }) => {
+      socketRef.current.emit('join-room', { roomId, userId: user.id, userName: user.name });
+      socketRef.current.on('room-users',  (users) => setRoomUsers(users));
+      socketRef.current.on('user-joined', ({ userName }) => addChatMessage(`${userName} joined the call`, 'system'));
+      socketRef.current.on('user-left',   ({ userId }) => {
         setRemoteStreams(prev => prev.filter(s => s.userId !== userId));
         addChatMessage('A user left the call', 'system');
       });
-
-      socketRef.current.on('chat-message', ({ message, userName, timestamp }) => {
-        addChatMessage(`${userName}: ${message}`, 'user');
-      });
-
-      socketRef.current.on('offer', async ({ offer, socketId }) => {
-        await handleOffer(offer, socketId, stream);
-      });
-
-      socketRef.current.on('answer', async ({ answer, socketId }) => {
-        await handleAnswer(answer, socketId);
-      });
-
-      socketRef.current.on('ice-candidate', async ({ candidate, socketId }) => {
-        await handleIceCandidate(candidate, socketId);
-      });
-
+      socketRef.current.on('chat-message', ({ message, userName }) =>
+        addChatMessage(`${userName}: ${message}`, 'user'));
     } catch (error) {
       console.error('Error accessing media devices:', error);
       alert('Could not access camera/microphone. Please check permissions.');
     }
   };
 
-  const addChatMessage = (message, type = 'user') => {
+  const addChatMessage = (message, type = 'user') =>
     setChatMessages(prev => [...prev, { message, type, time: new Date() }]);
-  };
-
-  const handleOffer = async (offer, socketId, stream) => {
-    console.log('Received offer from', socketId);
-  };
-
-  const handleAnswer = async (answer, socketId) => {
-    console.log('Received answer from', socketId);
-  };
-
-  const handleIceCandidate = async (candidate, socketId) => {
-    console.log('Received ICE candidate');
-  };
 
   const toggleAudio = () => {
     if (localStream) {
-      const audioTrack = localStream.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        setIsMuted(!audioTrack.enabled);
-      }
+      const t = localStream.getAudioTracks()[0];
+      if (t) { t.enabled = !t.enabled; setIsMuted(!t.enabled); }
     }
   };
 
   const toggleVideo = () => {
     if (localStream) {
-      const videoTrack = localStream.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        setIsVideoOff(!videoTrack.enabled);
-      }
+      const t = localStream.getVideoTracks()[0];
+      if (t) { t.enabled = !t.enabled; setIsVideoOff(!t.enabled); }
     }
   };
 
   const shareScreen = async () => {
     try {
       if (isScreenSharing) {
-        if (screenStreamRef.current) {
-          screenStreamRef.current.getTracks().forEach(track => track.stop());
-        }
+        screenStreamRef.current?.getTracks().forEach(t => t.stop());
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream;
-        }
-        setLocalStream(stream);
-        setIsScreenSharing(false);
+        if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+        setLocalStream(stream); setIsScreenSharing(false);
       } else {
         const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
         screenStreamRef.current = screenStream;
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = screenStream;
-        }
+        if (localVideoRef.current) localVideoRef.current.srcObject = screenStream;
         setIsScreenSharing(true);
-        screenStream.getVideoTracks()[0].onended = () => { shareScreen(); };
+        screenStream.getVideoTracks()[0].onended = () => shareScreen();
       }
-    } catch (error) {
-      console.error('Error sharing screen:', error);
-    }
+    } catch (error) { console.error('Error sharing screen:', error); }
   };
 
   const sendMessage = () => {
     if (chatInput.trim() && socketRef.current) {
-      socketRef.current.emit('chat-message', {
-        roomId,
-        message: chatInput,
-        userName: user.name
-      });
+      socketRef.current.emit('chat-message', { roomId, message: chatInput, userName: user.name });
       setChatInput('');
     }
   };
 
+  // ✅ updated leaveCall — stops face analysis and shows report
   const leaveCall = async () => {
     try {
-      if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-      }
-      if (screenStreamRef.current) {
-        screenStreamRef.current.getTracks().forEach(track => track.stop());
-      }
+      localStream?.getTracks().forEach(t => t.stop());
+      screenStreamRef.current?.getTracks().forEach(t => t.stop());
+      socketRef.current?.emit('leave-room', { roomId });
 
-      if (socketRef.current) {
-        socketRef.current.emit('leave-room', { roomId });
-      }
+      // Stop face analysis — triggers onReport callback
+      setFaceAnalysisOn(false);
 
       if (isHost || user.role === 'recruiter') {
-        try {
-          await API.post(`/meetings/${roomId}/end`);
-          console.log('✅ Meeting ended in DB');
-        } catch (err) {
-          console.warn('Could not end meeting in DB:', err.message);
-        }
+        try { await API.post(`/meetings/${roomId}/end`); } catch {}
       }
     } catch (err) {
       console.error('Leave call error:', err);
     } finally {
-      navigate('/dashboard');
+      // Show face report if we have one, then navigate
+      if (faceReport) {
+        setShowFaceReport(true);
+      } else {
+        navigate('/dashboard');
+      }
     }
+  };
+
+  // ✅ called by FaceAnalyzer when analysis ends
+  const handleFaceReport = (report) => {
+    setFaceReport(report);
   };
 
   return (
     <div className="video-call-container">
       <div className="video-main">
         <div className="video-grid">
-          <div className="video-wrapper local-video">
+
+          {/* Local video — wrapper needs position:relative for canvas overlay */}
+          <div className="video-wrapper local-video" style={{ position: 'relative' }}>
             <video
               ref={localVideoRef}
-              autoPlay
-              muted
-              playsInline
+              autoPlay muted playsInline
               className="video-element"
+            />
+            {/* ✅ FaceAnalyzer overlays on the local video */}
+            <FaceAnalyzer
+              videoRef={localVideoRef}
+              isActive={faceAnalysisOn}
+              onReport={handleFaceReport}
             />
             <div className="video-label">You {isScreenSharing && '(Screen)'}</div>
           </div>
@@ -240,6 +180,7 @@ function VideoCall() {
         </div>
       </div>
 
+      {/* Controls */}
       <div className="video-controls">
         <div className="controls-left">
           <span className="room-info">Room: {roomId?.substring(0, 8)}...</span>
@@ -264,6 +205,15 @@ function VideoCall() {
             🖥️
           </button>
 
+          {/* ✅ Face analysis toggle */}
+          <button
+            onClick={() => setFaceAnalysisOn(p => !p)}
+            className={`control-btn ${faceAnalysisOn ? 'btn-active' : ''}`}
+            title={faceAnalysisOn ? 'Stop face analysis' : 'Start face analysis'}
+            style={faceAnalysisOn ? { border: '2px solid #10b981' } : {}}>
+            🎭
+          </button>
+
           <button onClick={() => setShowChat(!showChat)}
             className="control-btn" title="Toggle chat">
             💬
@@ -282,9 +232,22 @@ function VideoCall() {
 
         <div className="controls-right">
           <span className="participants-count">👥 {roomUsers.length}</span>
+          {/* ✅ show report button if report exists mid-call */}
+          {faceReport && !faceAnalysisOn && (
+            <button
+              onClick={() => setShowFaceReport(true)}
+              style={{
+                marginLeft: 8, padding: '4px 12px', borderRadius: 8,
+                border: '1px solid #10b981', background: '#10b98120',
+                color: '#10b981', fontSize: 12, cursor: 'pointer',
+              }}>
+              📊 Behaviour Report
+            </button>
+          )}
         </div>
       </div>
 
+      {/* Chat sidebar */}
       {showChat && (
         <div className="chat-sidebar">
           <div className="chat-header">
@@ -304,16 +267,25 @@ function VideoCall() {
           <div className="chat-input-area">
             <input type="text" placeholder="Type a message..."
               value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+              onChange={e => setChatInput(e.target.value)}
+              onKeyPress={e => e.key === 'Enter' && sendMessage()}
               className="chat-input" />
             <button onClick={sendMessage} className="send-btn">Send</button>
           </div>
         </div>
       )}
 
-      {showAI && (
-        <HeyGenAvatar roomId={roomId} onClose={() => setShowAI(false)} />  // ✅ fixed
+      {showAI && <HeyGenAvatar roomId={roomId} onClose={() => setShowAI(false)} />}
+
+      {/* ✅ Face report modal */}
+      {showFaceReport && faceReport && (
+        <FaceReport
+          report={faceReport}
+          onClose={() => {
+            setShowFaceReport(false);
+            navigate('/dashboard');
+          }}
+        />
       )}
     </div>
   );

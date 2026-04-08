@@ -8,6 +8,9 @@ import CandidateDashboard from './pages/CandidateDashboard';
 import VideoCall          from './pages/VideoCall';
 import ARIASetup          from './pages/ARIASetup';
 import ARIAInterview      from './pages/ARIAInterview';
+import StudyMaterial      from './pages/StudyMaterial';
+import Mentorship           from './pages/Mentorship';
+import InterviewRoadmap from './pages/InterviewRoadmap';
 
 const isAuthenticated = () => localStorage.getItem('token') !== null;
 
@@ -31,6 +34,9 @@ function App() {
         <Route path="/room/:roomId"        element={<ProtectedRoute><VideoCall /></ProtectedRoute>} />
         <Route path="/aria-setup"          element={<ProtectedRoute><ARIASetup /></ProtectedRoute>} />
         <Route path="/aria-interview"      element={<ProtectedRoute><ARIAInterview /></ProtectedRoute>} />
+        <Route path="/study-material" element={<ProtectedRoute><StudyMaterial /></ProtectedRoute>} />
+        <Route path="/mentorship"     element={<ProtectedRoute><Mentorship /></ProtectedRoute>} />        
+        <Route path="/interview-roadmap" element={<ProtectedRoute><InterviewRoadmap /></ProtectedRoute>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -1,14 +1,19 @@
-const express      = require('express');
-const router       = express.Router();
-const aiController = require('../controllers/aiController');
-const { protect }  = require('../middleware/auth');
+const express     = require('express');
+const router      = express.Router();
+const aiCtrl      = require('../controllers/aiController');
+const { protect } = require('../middleware/auth');
 
-console.log("🚨 THIS ROUTE FILE IS BEING USED");
+console.log('🚨 AI ROUTE FILE LOADED');
 
-router.post('/generate-questions', aiController.generateQuestions);
-router.post('/analyze-answer',     aiController.analyzeAnswer);
-router.post('/get-response',       aiController.getAIResponse);
-router.post('/save-report',  protect, aiController.saveReport);
-router.get('/my-reports',    protect, aiController.getMyReports);
+// ── Public routes (no login needed) ──────────────────────────────────────────
+router.post('/generate-questions', aiCtrl.generateQuestions);
+router.post('/analyze-answer',     aiCtrl.analyzeAnswer);
+router.post('/get-response',       aiCtrl.getAIResponse);
+
+// ── Protected routes (login required) ────────────────────────────────────────
+router.post('/save-report', protect, aiCtrl.saveReport);
+router.get('/my-reports',   protect, aiCtrl.getMyReports);
+router.post('/generate-roadmap', protect, aiCtrl.generateRoadmap); 
+
 
 module.exports = router;

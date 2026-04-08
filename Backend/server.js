@@ -1,33 +1,43 @@
 // backend/server.js
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const http = require('http');
+const express    = require('express');
+const mongoose   = require('mongoose');
+const cors       = require('cors');
+const http       = require('http');
 const { Server } = require('socket.io');
 require('dotenv').config();
 
-const app = express();
+const app    = express();
 const server = http.createServer(app);
 
-// Socket.IO setup
-const io = new Server(server, {
-  cors: {
-    origin: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
-    credentials: true,
-    methods: ['GET', 'POST']
-  }
-});
-
-// ==================== MIDDLEWARE ====================
+// ==================== MIDDLEWARE (must come FIRST) ====================
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
-  credentials: true
+  origin: [
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://localhost:5175',
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ==================== DATABASE CONNECTION ====================
+// ==================== SOCKET.IO ====================
+const io = new Server(server, {
+  cors: {
+    origin: [
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'http://localhost:5175',
+    ],
+    credentials: true,
+    methods: ['GET', 'POST'],
+  }
+});
+
+// ==================== DATABASE ====================
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/hiremind';
 
 mongoose.connect(MONGODB_URI)
@@ -39,59 +49,49 @@ mongoose.connect(MONGODB_URI)
     console.error('❌ MongoDB Connection Error:', err.message);
   });
 
-// ==================== ROUTES ====================
-const authRoutes = require('./routes/auth');
-const meetingRoutes = require('./routes/meetings');
-const aiRoutes = require('./routes/ai');
-const avatarRoutes = require('./routes/avatar');
+// ==================== ROUTES (after middleware) ====================
+const authRoutes        = require('./routes/auth');
+const meetingRoutes     = require('./routes/meetings');
+const aiRoutes          = require('./routes/ai');
+const avatarRoutes      = require('./routes/avatar');
+const mentorshipRoutes  = require('./routes/mentorship');
 
-app.use('/api/auth', authRoutes);
-app.use('/api/meetings', meetingRoutes);
-app.use('/api/ai', aiRoutes);
-app.use('/api/avatar', avatarRoutes);
+app.use('/api/auth',        authRoutes);
+app.use('/api/meetings',    meetingRoutes);
+app.use('/api/ai',          aiRoutes);
+app.use('/api/avatar',      avatarRoutes);
+app.use('/api/mentorship',  mentorshipRoutes);
 
 app.get('/', (req, res) => {
-  res.json({ 
-    message: '🚀 HireMind Backend is Running!',
-    status: 'active',
-    timestamp: new Date()
+  res.json({
+    message:   '🚀 HireMind Backend is Running!',
+    status:    'active',
+    timestamp: new Date(),
   });
 });
 
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'healthy',
-    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+  res.json({
+    status:   'healthy',
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
   });
 });
 
 // ==================== SOCKET.IO LOGIC ====================
-const rooms = new Map(); // Store active rooms
+const rooms = new Map();
 
 io.on('connection', (socket) => {
   console.log('✅ User connected:', socket.id);
 
-  // Join room
   socket.on('join-room', ({ roomId, userId, userName }) => {
     socket.join(roomId);
-    
-    // Add user to room
-    if (!rooms.has(roomId)) {
-      rooms.set(roomId, new Set());
-    }
+    if (!rooms.has(roomId)) rooms.set(roomId, new Set());
     rooms.get(roomId).add({ socketId: socket.id, userId, userName });
-
     console.log(`📹 ${userName} joined room: ${roomId}`);
-
-    // Notify others in room
     socket.to(roomId).emit('user-joined', { userId, userName });
-
-    // Send current users in room
-    const usersInRoom = Array.from(rooms.get(roomId) || []);
-    socket.emit('room-users', usersInRoom);
+    socket.emit('room-users', Array.from(rooms.get(roomId) || []));
   });
 
-  // WebRTC signaling
   socket.on('offer', ({ offer, roomId, targetSocketId }) => {
     socket.to(targetSocketId).emit('offer', { offer, socketId: socket.id });
   });
@@ -104,19 +104,12 @@ io.on('connection', (socket) => {
     socket.to(targetSocketId).emit('ice-candidate', { candidate, socketId: socket.id });
   });
 
-  // Chat messages
   socket.on('chat-message', ({ roomId, message, userName }) => {
-    io.to(roomId).emit('chat-message', {
-      message,
-      userName,
-      timestamp: new Date()
-    });
+    io.to(roomId).emit('chat-message', { message, userName, timestamp: new Date() });
   });
 
-  // Leave room
   socket.on('leave-room', ({ roomId }) => {
     socket.leave(roomId);
-    
     if (rooms.has(roomId)) {
       const roomUsers = rooms.get(roomId);
       roomUsers.forEach(user => {
@@ -128,11 +121,8 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Disconnect
   socket.on('disconnect', () => {
     console.log('❌ User disconnected:', socket.id);
-    
-    // Remove user from all rooms
     rooms.forEach((users, roomId) => {
       users.forEach(user => {
         if (user.socketId === socket.id) {
@@ -146,18 +136,12 @@ io.on('connection', (socket) => {
 
 // ==================== ERROR HANDLING ====================
 app.use((req, res) => {
-  res.status(404).json({ 
-    error: 'Route not found',
-    path: req.path 
-  });
+  res.status(404).json({ error: 'Route not found', path: req.path });
 });
 
 app.use((err, req, res, next) => {
   console.error('Error:', err.message);
-  res.status(500).json({ 
-    error: 'Something went wrong!',
-    message: err.message 
-  });
+  res.status(500).json({ error: 'Something went wrong!', message: err.message });
 });
 
 // ==================== START SERVER ====================

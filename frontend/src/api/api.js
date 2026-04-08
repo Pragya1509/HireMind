@@ -1,5 +1,4 @@
 // frontend/src/api/api.js
-
 import axios from 'axios';
 
 const API = axios.create({
@@ -13,24 +12,24 @@ API.interceptors.request.use((config) => {
   return config;
 });
 
-// ─── Auth ─────────────────────────
+// ─── Auth ─────────────────────────────────────────────────────────────────────
 export const signup       = (data) => API.post('/auth/signup', data);
-export const login        = (data) => API.post('/auth/login', data);   // ✅ added — Login.jsx uses this
-export const loginUser    = (data) => API.post('/auth/login', data);   // kept for compatibility
-export const registerUser = (data) => API.post('/auth/signup', data);  // kept for compatibility
+export const login        = (data) => API.post('/auth/login', data);
+export const loginUser    = (data) => API.post('/auth/login', data);   // compatibility
+export const registerUser = (data) => API.post('/auth/signup', data);  // compatibility
 
-// ─── Meetings ─────────────────────
+// ─── Meetings ─────────────────────────────────────────────────────────────────
 export const createMeeting = (data)   => API.post('/meetings/create', data);
 export const getMyMeetings = ()       => API.get('/meetings/my-meetings');
 export const endMeeting    = (roomId) => API.post(`/meetings/${roomId}/end`);
 
-// ─── Reports ──────────────────────
-export const saveReport   = (data) => API.post('/reports/save', data);
-export const getMyReports = ()     => API.get('/reports/my-reports');
+// ─── Reports (via /ai routes — matches aiController + ai.js routes) ──────────
+export const saveReport   = (data) => API.post('/ai/save-report', data);
+export const getMyReports = ()     => API.get('/ai/my-reports');
 
-// ─── AI ───────────────────────────
+export const generateRoadmap = (data) => API.post('/ai/generate-roadmap', data);
 
-// Returns full axios response so callers read response.data.questions
+// ─── AI ───────────────────────────────────────────────────────────────────────
 export const generateQuestions = (role, count = 5) =>
   API.post('/ai/generate-questions', { role, count });
 

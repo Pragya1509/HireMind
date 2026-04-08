@@ -28,7 +28,6 @@ const extractJSONObject = (text) => {
 
 // ===============================
 // 🎯 GENERATE QUESTIONS
-// Exported as generateQuestions to match aiService/aiController calls
 // ===============================
 exports.generateQuestions = async (role, count = 5) => {
   try {

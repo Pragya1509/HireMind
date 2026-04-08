@@ -214,20 +214,7 @@ export default function ARIASetup() {
               <h2>Almost ready!</h2>
               <p>Check your setup before the interview begins.</p>
 
-              <label className="aria-label">Language</label>
-              <select className="aria-select"
-                value={form.language}
-                onChange={e => update('language', e.target.value)}>
-                <option value="english">🇬🇧 English</option>
-                <option value="hindi">🇮🇳 Hindi</option>
-                <option value="hinglish">🇮🇳 Hinglish (Hindi + English)</option>
-                <option value="french">🇫🇷 French</option>
-                <option value="spanish">🇪🇸 Spanish</option>
-                <option value="german">🇩🇪 German</option>
-                <option value="arabic">🇸🇦 Arabic</option>
-              </select>
-
-              <div style={{ marginTop: 24 }}>
+              <div style={{ marginTop: 8 }}>
                 <label className="aria-label">Device Check</label>
                 <div className="device-row">
                   <div className={`device-card ${form.cameraOn ? 'on' : 'off'}`}
@@ -243,7 +230,7 @@ export default function ARIASetup() {
                 </div>
               </div>
 
-              {/* Summary */}
+              {/* Summary — no language row */}
               <div className="aria-summary">
                 <h4>Your Session</h4>
                 <div className="summary-row">
@@ -265,10 +252,6 @@ export default function ARIASetup() {
                 <div className="summary-row">
                   <span>Questions</span>
                   <strong>{form.duration}</strong>
-                </div>
-                <div className="summary-row">
-                  <span>Language</span>
-                  <strong style={{ textTransform: 'capitalize' }}>{form.language}</strong>
                 </div>
               </div>
             </div>
